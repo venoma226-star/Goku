@@ -27,7 +27,7 @@ threading.Thread(target=run_flask).start()
 # DISCORD BOT SETUP
 # ----------------------
 TOKEN = os.environ.get("TOKEN")
-CHANNEL_ID = 1448181797786750988
+CHANNEL_ID = 1448207122352570501
 OWNER_ID = 1355140133661184221
 
 intents = nextcord.Intents.default()
