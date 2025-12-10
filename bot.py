@@ -191,6 +191,63 @@ async def createchannels(interaction: Interaction):
 
     asyncio.create_task(create_channels_safely(interaction.guild))
 
+current_batch = 1  # starts with moving 1–50
+
+
+@bot.slash_command(name="groupchannels", description="Move next 50 numbered channels into the next SpawnZone category")
+async def groupchannels(interaction: Interaction):
+    global current_batch
+
+    if interaction.user.id != OWNER_ID:
+        await interaction.response.send_message("You cannot use this.", ephemeral=True)
+        return
+
+    # Hard limit
+    if current_batch > 8:
+        await interaction.response.send_message("All 400 channels already organized!", ephemeral=True)
+        return
+
+    await interaction.response.send_message(
+        f"📦 Moving channels batch **{current_batch}** (50 channels)...",
+        ephemeral=True
+    )
+
+    guild = interaction.guild
+
+    # Determine number range
+    start_num = (current_batch - 1) * 50 + 1
+    end_num = start_num + 49  # example: 1–50, next 51–100
+
+    # Category name
+    category_name = f"SpawnZone {current_batch}"
+
+    # Create category if missing
+    category = nextcord.utils.get(guild.categories, name=category_name)
+    if not category:
+        category = await guild.create_category(category_name)
+
+    moved = 0
+
+    # Loop through 50 channels
+    for n in range(start_num, end_num + 1):
+        channel = nextcord.utils.get(guild.text_channels, name=str(n))
+        if channel:
+            try:
+                await channel.edit(category=category)
+                moved += 1
+                await asyncio.sleep(1)  # safe delay
+            except Exception as e:
+                print(f"Error moving {channel}: {e}")
+
+    # Increase batch for next run
+    current_batch += 1
+
+    await interaction.followup.send(
+        f"✅ Moved **{moved} channels** into **{category_name}**.\n"
+        f"Next run will sort channels {((current_batch-1)*50)+1}–{((current_batch)*50)}.",
+        ephemeral=True
+    )
+
 # ----------------------
 # RUN BOT
 # ----------------------
