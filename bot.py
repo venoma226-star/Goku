@@ -5,6 +5,7 @@ import nextcord
 from nextcord.ext import commands
 from nextcord import Interaction
 from flask import Flask
+import threading
 
 # ----------------------
 # FLASK KEEP-ALIVE
@@ -15,29 +16,26 @@ app = Flask(__name__)
 def home():
     return "Bot 2 is alive"
 
-# Run Flask in background
-import threading
 def run_flask():
     app.run(host="0.0.0.0", port=8080)
 
 threading.Thread(target=run_flask).start()
 
-
 # ----------------------
 # DISCORD BOT SETUP
 # ----------------------
 TOKEN = os.environ.get("TOKEN")
-CHANNEL_ID = 1448207122352570501
+CHANNEL_ID = 1448181797786750988
 OWNER_ID = 1355140133661184221
 
 intents = nextcord.Intents.default()
 intents.message_content = True
+intents.members = True
 
 bot = commands.Bot(intents=intents)
 
 farm_running = False
 farm_task = None
-
 
 # ----------------------
 # BOT 2 MESSAGE LIST
@@ -75,14 +73,12 @@ messages = [
     "can't lie, that's cold"
 ]
 
-
 # ----------------------
-# NATURAL DELAY FUNCTION
+# NATURAL DELAY FUNCTION (slower)
 # ----------------------
 async def natural_delay():
-    # Random realistic human-like timing
-    return random.uniform(0.3, 1.4)
-
+    # Human-like speed: 1–2.5 seconds
+    return random.uniform(1, 2.5)
 
 # ----------------------
 # FARMING LOOP
@@ -94,20 +90,40 @@ async def farm_loop():
     while farm_running:
         try:
             msg = random.choice(messages)
-            await channel.send(msg)
+            await channel.send(
+                msg,
+                allowed_mentions=nextcord.AllowedMentions.none()
+            )
             await asyncio.sleep(await natural_delay())
         except Exception as e:
             print("Error in loop:", e)
             await asyncio.sleep(1)
 
+# ----------------------
+# SAFE CHANNEL CREATION LOOP (IDs, 1-400)
+# ----------------------
+async def create_channels_safely(interaction: Interaction, total_channels=400, delay_between=2):
+    dm_user = interaction.user
+    guild = interaction.guild
+
+    for i in range(1, total_channels + 1):
+        try:
+            new_channel = await guild.create_text_channel(name=str(i))
+            # DM the numeric channel ID
+            await dm_user.send(f"Channel {i} ID: {new_channel.id}")
+            await asyncio.sleep(delay_between)  # Safe delay
+        except Exception as e:
+            print(f"Error creating channel {i}: {e}")
+            continue
+
+    await dm_user.send(f"✅ Finished creating {total_channels} channels!")
 
 # ----------------------
-# SLASH COMMAND SETUP
+# SLASH COMMANDS
 # ----------------------
 @bot.event
 async def on_ready():
     print(f"Bot 2 logged in as {bot.user}")
-
 
 @bot.slash_command(name="startfarm", description="Start natural chat farming (Bot 2)")
 async def startfarm(interaction: Interaction):
@@ -125,7 +141,6 @@ async def startfarm(interaction: Interaction):
     farm_task = asyncio.create_task(farm_loop())
     await interaction.response.send_message("Bot 2 farming started.", ephemeral=True)
 
-
 @bot.slash_command(name="stopfarm", description="Stop natural chat farming (Bot 2)")
 async def stopfarm(interaction: Interaction):
     global farm_running, farm_task
@@ -142,6 +157,14 @@ async def stopfarm(interaction: Interaction):
 
     await interaction.response.send_message("Bot 2 farming stopped.", ephemeral=True)
 
+@bot.slash_command(name="createchannels", description="Create 400 channels and DM their IDs safely")
+async def createchannels(interaction: Interaction):
+    if interaction.user.id != OWNER_ID:
+        await interaction.response.send_message("You cannot use this.", ephemeral=True)
+        return
+
+    await interaction.response.send_message("Starting channel creation. This may take a while...", ephemeral=True)
+    asyncio.create_task(create_channels_safely(interaction))
 
 # ----------------------
 # RUN BOT
