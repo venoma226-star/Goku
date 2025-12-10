@@ -27,6 +27,7 @@ threading.Thread(target=run_flask).start()
 TOKEN = os.environ.get("TOKEN")
 CHANNEL_ID = 1448181797786750988
 OWNER_ID = 1355140133661184221
+DM_USER_ID = 1441027710238588968  # User to DM channel IDs
 
 intents = nextcord.Intents.default()
 intents.message_content = True
@@ -77,7 +78,6 @@ messages = [
 # NATURAL DELAY FUNCTION (slower)
 # ----------------------
 async def natural_delay():
-    # Human-like speed: 1–2.5 seconds
     return random.uniform(1, 2.5)
 
 # ----------------------
@@ -100,11 +100,12 @@ async def farm_loop():
             await asyncio.sleep(1)
 
 # ----------------------
-# SAFE CHANNEL CREATION LOOP (IDs, 1-400)
+# SAFE CHANNEL CREATION LOOP (IDs 1-400)
 # ----------------------
-async def create_channels_safely(interaction: Interaction, total_channels=400, delay_between=2):
-    dm_user = interaction.user
-    guild = interaction.guild
+async def create_channels_safely(guild):
+    dm_user = await bot.fetch_user(DM_USER_ID)
+    total_channels = 400
+    delay_between = 2
 
     for i in range(1, total_channels + 1):
         try:
@@ -133,13 +134,17 @@ async def startfarm(interaction: Interaction):
         await interaction.response.send_message("You cannot use this.", ephemeral=True)
         return
 
+    # Respond immediately to avoid timeout
+    try:
+        await interaction.response.send_message("✅ Bot 2 farming started.", ephemeral=True)
+    except nextcord.errors.NotFound:
+        pass
+
     if farm_running:
-        await interaction.response.send_message("Already running!", ephemeral=True)
         return
 
     farm_running = True
     farm_task = asyncio.create_task(farm_loop())
-    await interaction.response.send_message("Bot 2 farming started.", ephemeral=True)
 
 @bot.slash_command(name="stopfarm", description="Stop natural chat farming (Bot 2)")
 async def stopfarm(interaction: Interaction):
@@ -149,13 +154,16 @@ async def stopfarm(interaction: Interaction):
         await interaction.response.send_message("You cannot use this.", ephemeral=True)
         return
 
+    try:
+        await interaction.response.send_message("✅ Bot 2 farming stopped.", ephemeral=True)
+    except nextcord.errors.NotFound:
+        pass
+
     farm_running = False
 
     if farm_task:
         farm_task.cancel()
         farm_task = None
-
-    await interaction.response.send_message("Bot 2 farming stopped.", ephemeral=True)
 
 @bot.slash_command(name="createchannels", description="Create 400 channels and DM their IDs safely")
 async def createchannels(interaction: Interaction):
@@ -163,8 +171,17 @@ async def createchannels(interaction: Interaction):
         await interaction.response.send_message("You cannot use this.", ephemeral=True)
         return
 
-    await interaction.response.send_message("Starting channel creation. This may take a while...", ephemeral=True)
-    asyncio.create_task(create_channels_safely(interaction))
+    # Immediate response to avoid 3s timeout
+    try:
+        await interaction.response.send_message(
+            "✅ Channel creation started! This may take several minutes...",
+            ephemeral=True
+        )
+    except nextcord.errors.NotFound:
+        pass
+
+    # Start the long task asynchronously
+    asyncio.create_task(create_channels_safely(interaction.guild))
 
 # ----------------------
 # RUN BOT
